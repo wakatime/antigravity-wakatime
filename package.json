@@ -1,0 +1,28 @@
+{
+  "name": "antigravity-cli-wakatime",
+  "version": "1.0.0",
+  "description": "WakaTime plugin for Antigravity CLI",
+  "bin": {
+    "antigravity-cli-wakatime": "bin/antigravity-cli-wakatime.js"
+  },
+  "scripts": {
+    "test": "node --test && node --check bin/antigravity-cli-wakatime.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wakatime/antigravity-cli-wakatime.git"
+  },
+  "keywords": [
+    "antigravity",
+    "antigravity-cli",
+    "wakatime",
+    "time-tracking",
+    "ai"
+  ],
+  "author": "WakaTime",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/wakatime/antigravity-cli-wakatime/issues"
+  },
+  "homepage": "https://github.com/wakatime/antigravity-cli-wakatime#readme"
+}

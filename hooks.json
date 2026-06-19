@@ -1,0 +1,23 @@
+{
+  "antigravity-cli-wakatime": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./bin/antigravity-cli-wakatime.js --background --event=preInvocation",
+        "timeout": 5
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./bin/antigravity-cli-wakatime.js --background --event=postToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
