@@ -9,7 +9,7 @@ The hook runner is detached and passes hook payloads over a pipe. It does not cr
 ## Install
 
 ```sh
-agy plugin install /path/to/antigravity-cli-wakatime
+agy plugin install https://github.com/wakatime/antigravity-cli-wakatime
 ```
 
 Restart Antigravity CLI after installing the plugin.
