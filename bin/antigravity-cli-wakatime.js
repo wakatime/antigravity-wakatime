@@ -126,7 +126,7 @@ function getProjectFolder(input) {
 async function syncAiHeartbeats(cliPath, input) {
   const antigravityVersion = await getAntigravityVersion();
   const plugin = `antigravity-cli/${antigravityVersion || 'unknown'} ${PLUGIN_NAME}/${VERSION}`;
-  const args = ['--sync-ai-heartbeats', '--plugin', plugin];
+  const args = ['--sync-ai-activity', '--plugin', plugin];
   const projectFolder = getProjectFolder(input);
 
   if (projectFolder) args.push('--project-folder', projectFolder);
@@ -440,9 +440,7 @@ async function sendRequest(url) {
           port: requestUrl.port ? Number.parseInt(requestUrl.port, 10) : isHttpsRequest ? 443 : 80,
           path: proxyUrl ? targetUrl.toString() : `${targetUrl.pathname}${targetUrl.search}`,
           method: 'GET',
-          headers: proxyUrl
-            ? { Host: targetUrl.host, ...headers, ...(authHeader ? { 'Proxy-Authorization': authHeader } : {}) }
-            : headers,
+          headers: proxyUrl ? { Host: targetUrl.host, ...headers, ...(authHeader ? { 'Proxy-Authorization': authHeader } : {}) } : headers,
         };
 
         if (isHttpsRequest) {
@@ -496,9 +494,9 @@ function createProxyTunnel(proxyUrl, targetUrl, rejectUnauthorized) {
       resolve(baseSocket);
     };
 
-    const connectRequest = `CONNECT ${targetUrl.hostname}:${targetUrl.port || 443} HTTP/1.1\r\nHost: ${targetUrl.hostname}:${
-      targetUrl.port || 443
-    }\r\n${auth ? `Proxy-Authorization: ${auth}\r\n` : ''}Connection: close\r\n\r\n`;
+    const connectRequest = `CONNECT ${targetUrl.hostname}:${targetUrl.port || 443} HTTP/1.1\r\nHost: ${targetUrl.hostname}:${targetUrl.port || 443}\r\n${
+      auth ? `Proxy-Authorization: ${auth}\r\n` : ''
+    }Connection: close\r\n\r\n`;
     baseSocket.once('error', onError);
     baseSocket.on('data', onData);
     if (proxyUrl.protocol === 'https:') {
@@ -591,7 +589,11 @@ function getSetting(section, key) {
       if (currentSection !== section) continue;
       const index = line.indexOf('=');
       if (index === -1) continue;
-      if (line.slice(0, index).trim() === key) return line.slice(index + 1).trim().replace(/\0/g, '');
+      if (line.slice(0, index).trim() === key)
+        return line
+          .slice(index + 1)
+          .trim()
+          .replace(/\0/g, '');
     }
   } catch (_) {}
   return undefined;

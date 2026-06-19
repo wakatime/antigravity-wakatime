@@ -82,25 +82,21 @@ test('hooks invoke the runner instead of node directly', () => {
   assert.match(hooks, /\.\/scripts\/run --event=postToolUse/);
 });
 
-test(
-  'runner uses NODE_BIN when node is unavailable in PATH',
-  { skip: process.platform === 'win32' },
-  () => {
-    const result = childProcess.spawnSync('/bin/sh', [runnerPath, '--event=postToolUse'], {
-      env: {
-        ...process.env,
-        NODE_BIN: process.execPath,
-        NODE_OPTIONS: '--definitely-not-a-valid-node-option',
-        PATH: '',
-      },
-      input: '',
-      encoding: 'utf8',
-    });
+test('runner uses NODE_BIN when node is unavailable in PATH', { skip: process.platform === 'win32' }, () => {
+  const result = childProcess.spawnSync('/bin/sh', [runnerPath, '--event=postToolUse'], {
+    env: {
+      ...process.env,
+      NODE_BIN: process.execPath,
+      NODE_OPTIONS: '--definitely-not-a-valid-node-option',
+      PATH: '',
+    },
+    input: '',
+    encoding: 'utf8',
+  });
 
-    assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(JSON.parse(result.stdout), {});
-  },
-);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {});
+});
 
 test('syncs the first invocation with Antigravity and project metadata', (t) => {
   const fixture = createFixture(t);
@@ -117,13 +113,7 @@ test('syncs the first invocation with Antigravity and project metadata', (t) => 
 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(readCalls(fixture.captureFile), [
-    [
-      '--sync-ai-heartbeats',
-      '--plugin',
-      'antigravity-cli/9.8.7 antigravity-cli-wakatime/1.0.0',
-      '--project-folder',
-      '/workspace/project',
-    ],
+    ['--sync-ai-activity', '--plugin', 'antigravity-cli/9.8.7 antigravity-cli-wakatime/1.0.0', '--project-folder', '/workspace/project'],
   ]);
 });
 
@@ -139,8 +129,6 @@ test('background hook returns valid JSON and leaves no payload or state files', 
   assert.deepEqual(JSON.parse(result.stdout), {});
   assert.equal((await waitForCall(fixture.captureFile)).length, 1);
 
-  const unexpected = fs
-    .readdirSync(fixture.wakatimeDir)
-    .filter((name) => /(?:hook|state|temp|tmp|backup|\.zip)/i.test(name));
+  const unexpected = fs.readdirSync(fixture.wakatimeDir).filter((name) => /(?:hook|state|temp|tmp|backup|\.zip)/i.test(name));
   assert.deepEqual(unexpected, []);
 });
