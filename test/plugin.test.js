@@ -19,7 +19,7 @@ function architecture() {
   return process.arch;
 }
 
-function createFixture(t) {
+function createFixture(t, runtimeEnv = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'antigravity-cli-wakatime-'));
   const wakatimeDir = path.join(home, '.wakatime');
   const captureFile = path.join(home, 'calls.jsonl');
@@ -41,16 +41,22 @@ if (process.argv.includes('--version')) {
   );
 
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const env = {
+    ...process.env,
+    WAKATIME_HOME: home,
+    WAKATIME_TEST_CAPTURE: captureFile,
+  };
+  delete env.AGY_CLI_VERSION;
+  delete env.ANTIGRAVITY_CLI_VERSION;
+  delete env.ANTIGRAVITY_DESKTOP_VERSION;
+  delete env.ANTIGRAVITY_IDE_VERSION;
+  delete env.ANTIGRAVITY_VERSION;
+
   return {
     home,
     wakatimeDir,
     captureFile,
-    env: {
-      ...process.env,
-      AGY_CLI_VERSION: '9.8.7',
-      WAKATIME_HOME: home,
-      WAKATIME_TEST_CAPTURE: captureFile,
-    },
+    env: { ...env, ...runtimeEnv },
   };
 }
 
@@ -98,12 +104,13 @@ test('runner uses NODE_BIN when node is unavailable in PATH', { skip: process.pl
   assert.deepEqual(JSON.parse(result.stdout), {});
 });
 
-test('syncs the first invocation with Antigravity and project metadata', (t) => {
-  const fixture = createFixture(t);
+test('syncs the first invocation with Antigravity CLI and project metadata', (t) => {
+  const fixture = createFixture(t, { AGY_CLI_VERSION: '9.8.7' });
   const input = {
     invocationNum: 0,
     initialNumSteps: 1,
     workspacePaths: ['/workspace/project', '/workspace/secondary'],
+    transcriptPath: '/home/user/.gemini/antigravity-cli/brain/session/.system_generated/logs/transcript.jsonl',
   };
   const result = childProcess.spawnSync(process.execPath, [pluginPath, '--event=preInvocation'], {
     env: fixture.env,
@@ -114,6 +121,58 @@ test('syncs the first invocation with Antigravity and project metadata', (t) => 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(readCalls(fixture.captureFile), [
     ['--sync-ai-activity', '--plugin', 'antigravity-cli/9.8.7 antigravity-cli-wakatime/1.0.0', '--project-folder', '/workspace/project'],
+  ]);
+});
+
+test('identifies Antigravity desktop from the hook payload', (t) => {
+  const fixture = createFixture(t, { AGY_CLI_VERSION: '9.8.7' });
+  const plistPath = path.join(fixture.home, 'Applications', 'Antigravity.app', 'Contents', 'Info.plist');
+  fs.mkdirSync(path.dirname(plistPath), { recursive: true });
+  fs.writeFileSync(
+    plistPath,
+    '<plist><dict><key>CFBundleShortVersionString</key><string>2.1.4</string></dict></plist>',
+  );
+  const input = {
+    invocationNum: 0,
+    initialNumSteps: 1,
+    workspacePaths: ['/workspace/project'],
+    transcriptPath: '/home/user/.gemini/antigravity/brain/session/.system_generated/logs/transcript.jsonl',
+  };
+  const result = childProcess.spawnSync(process.execPath, [pluginPath, '--event=preInvocation'], {
+    env: fixture.env,
+    input: JSON.stringify(input),
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readCalls(fixture.captureFile), [
+    ['--sync-ai-activity', '--plugin', 'antigravity-desktop/2.1.4 antigravity-cli-wakatime/1.0.0', '--project-folder', '/workspace/project'],
+  ]);
+});
+
+test('identifies Antigravity desktop from its global plugin install path', (t) => {
+  const fixture = createFixture(t, { ANTIGRAVITY_DESKTOP_VERSION: '2.1.4' });
+  const installedPluginPath = path.join(
+    fixture.home,
+    '.gemini',
+    'config',
+    'plugins',
+    'antigravity-cli-wakatime',
+    'bin',
+    'antigravity-cli-wakatime.js',
+  );
+  fs.mkdirSync(path.dirname(installedPluginPath), { recursive: true });
+  fs.copyFileSync(pluginPath, installedPluginPath);
+
+  const result = childProcess.spawnSync(process.execPath, [installedPluginPath, '--event=postToolUse'], {
+    env: fixture.env,
+    input: JSON.stringify({ workspacePaths: ['/workspace/project'], stepIdx: 3 }),
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(readCalls(fixture.captureFile), [
+    ['--sync-ai-activity', '--plugin', 'antigravity-desktop/2.1.4 antigravity-cli-wakatime/1.0.0', '--project-folder', '/workspace/project'],
   ]);
 });
 

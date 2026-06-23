@@ -14,6 +14,9 @@ const VERSION = '1.0.0';
 const PLUGIN_NAME = 'antigravity-cli-wakatime';
 const GITHUB_DOWNLOAD_URL = 'https://github.com/wakatime/wakatime-cli/releases/latest/download';
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/wakatime/wakatime-cli/releases/latest';
+const ANTIGRAVITY_CLI = Object.freeze({ product: 'antigravity-cli' });
+const ANTIGRAVITY_DESKTOP = Object.freeze({ product: 'antigravity-desktop' });
+const ANTIGRAVITY_IDE = Object.freeze({ product: 'antigravity-ide' });
 
 main().catch((error) => {
   logException('ERROR', error);
@@ -124,8 +127,9 @@ function getProjectFolder(input) {
 }
 
 async function syncAiHeartbeats(cliPath, input) {
-  const antigravityVersion = await getAntigravityVersion();
-  const plugin = `antigravity-cli/${antigravityVersion || 'unknown'} ${PLUGIN_NAME}/${VERSION}`;
+  const runtime = getAntigravityRuntime(input);
+  const antigravityVersion = await getAntigravityVersion(runtime);
+  const plugin = `${runtime.product}/${antigravityVersion || 'unknown'} ${PLUGIN_NAME}/${VERSION}`;
   const args = ['--sync-ai-activity', '--plugin', plugin];
   const projectFolder = getProjectFolder(input);
 
@@ -146,9 +150,48 @@ async function syncAiHeartbeats(cliPath, input) {
   }
 }
 
-async function getAntigravityVersion() {
-  const envVersion = process.env.ANTIGRAVITY_CLI_VERSION || process.env.AGY_CLI_VERSION;
+function getAntigravityRuntime(input) {
+  const payloadPaths = [input.transcriptPath, input.transcript_path, input.artifactDirectoryPath, input.artifact_directory_path];
+
+  for (const candidate of payloadPaths) {
+    const runtime = getAntigravityRuntimeFromPath(candidate);
+    if (runtime) return runtime;
+  }
+
+  const installedRuntime = getAntigravityRuntimeFromPath(__filename);
+  if (installedRuntime) return installedRuntime;
+
+  if (process.env.ANTIGRAVITY_DESKTOP_VERSION) return ANTIGRAVITY_DESKTOP;
+  if (process.env.ANTIGRAVITY_IDE_VERSION) return ANTIGRAVITY_IDE;
+  return ANTIGRAVITY_CLI;
+}
+
+function getAntigravityRuntimeFromPath(candidate) {
+  if (typeof candidate !== 'string' || !candidate.trim()) return undefined;
+
+  const normalized = `/${candidate.replace(/\\/g, '/').toLowerCase()}/`.replace(/\/+/g, '/');
+  if (normalized.includes('/.gemini/antigravity-cli/')) return ANTIGRAVITY_CLI;
+  if (normalized.includes('/.gemini/antigravity-ide/')) return ANTIGRAVITY_IDE;
+  if (normalized.includes('/.gemini/antigravity/')) return ANTIGRAVITY_DESKTOP;
+  if (normalized.includes('/.gemini/config/plugins/')) return ANTIGRAVITY_DESKTOP;
+  return undefined;
+}
+
+async function getAntigravityVersion(runtime) {
+  let envVersion;
+  if (runtime === ANTIGRAVITY_DESKTOP) {
+    envVersion = process.env.ANTIGRAVITY_DESKTOP_VERSION || process.env.ANTIGRAVITY_VERSION;
+  } else if (runtime === ANTIGRAVITY_IDE) {
+    envVersion = process.env.ANTIGRAVITY_IDE_VERSION || process.env.ANTIGRAVITY_VERSION;
+  } else {
+    envVersion = process.env.ANTIGRAVITY_CLI_VERSION || process.env.AGY_CLI_VERSION;
+  }
   if (envVersion) return envVersion;
+
+  const installedVersion = getInstalledAntigravityVersion(runtime);
+  if (installedVersion) return installedVersion;
+
+  if (runtime !== ANTIGRAVITY_CLI) return '';
 
   try {
     const result = await execFile('agy', ['--version'], { windowsHide: true, timeout: 2000 });
@@ -158,6 +201,93 @@ async function getAntigravityVersion() {
   } catch (_) {
     return '';
   }
+}
+
+function getInstalledAntigravityVersion(runtime) {
+  if (runtime === ANTIGRAVITY_DESKTOP) {
+    return readFirstVersion(getAntigravityDesktopPlistPaths(), readPlistVersion);
+  }
+  if (runtime === ANTIGRAVITY_IDE) {
+    return readFirstVersion(getAntigravityIdeProductPaths(), readJsonVersion);
+  }
+  return '';
+}
+
+function getAntigravityDesktopPlistPaths() {
+  const home = getHomeDirectory();
+  const paths = [];
+  const executable = getAntigravityAgentExecutable('antigravity');
+  const appIndex = executable.toLowerCase().indexOf('.app/');
+  if (appIndex !== -1) {
+    paths.push(path.normalize(`${executable.slice(0, appIndex + 4)}/Contents/Info.plist`));
+  }
+  paths.push(
+    path.join(home, 'Applications', 'Antigravity.app', 'Contents', 'Info.plist'),
+    path.join(path.parse(home).root, 'Applications', 'Antigravity.app', 'Contents', 'Info.plist'),
+  );
+  return paths;
+}
+
+function getAntigravityIdeProductPaths() {
+  const home = getHomeDirectory();
+  const paths = [];
+  const executable = getAntigravityAgentExecutable('antigravity-ide');
+  const extensionsIndex = executable.toLowerCase().indexOf('/extensions/');
+  if (extensionsIndex !== -1) {
+    paths.push(path.normalize(`${executable.slice(0, extensionsIndex)}/product.json`));
+  }
+  paths.push(
+    path.join(home, 'Applications', 'Antigravity IDE.app', 'Contents', 'Resources', 'app', 'product.json'),
+    path.join(path.parse(home).root, 'Applications', 'Antigravity IDE.app', 'Contents', 'Resources', 'app', 'product.json'),
+    path.join(home, 'AppData', 'Local', 'Programs', 'Antigravity IDE', 'resources', 'app', 'product.json'),
+    path.join(path.parse(home).root, 'usr', 'share', 'antigravity-ide', 'resources', 'app', 'product.json'),
+    path.join(path.parse(home).root, 'opt', 'Antigravity IDE', 'resources', 'app', 'product.json'),
+  );
+  return paths;
+}
+
+function getAntigravityAgentExecutable(appDir) {
+  try {
+    const script = fs.readFileSync(path.join(getHomeDirectory(), '.gemini', appDir, 'bin', 'agentapi'), 'utf8');
+    const match = script.match(/\bexec\s+["']([^"']+)["']/);
+    return match ? match[1].replace(/\\/g, '/') : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function readFirstVersion(paths, reader) {
+  for (const candidate of new Set(paths)) {
+    const version = reader(candidate);
+    if (version) return version;
+  }
+  return '';
+}
+
+function readPlistVersion(file) {
+  try {
+    const contents = fs.readFileSync(file, 'utf8');
+    const match = contents.match(/<key>\s*CFBundleShortVersionString\s*<\/key>\s*<string>\s*([^<]+?)\s*<\/string>/i);
+    return match ? normalizeVersion(match[1]) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function readJsonVersion(file) {
+  try {
+    return normalizeVersion(JSON.parse(fs.readFileSync(file, 'utf8')).version);
+  } catch (_) {
+    return '';
+  }
+}
+
+function normalizeVersion(value) {
+  for (const field of String(value || '').split(/\s+/)) {
+    const version = field.replace(/^[vV,;()[\]{}]+|[,;()[\]{}]+$/g, '');
+    if (/\d/.test(version) && /^[A-Za-z0-9._+-]+$/.test(version)) return version.toLowerCase();
+  }
+  return '';
 }
 
 async function ensureWakatimeCli(options = {}) {
