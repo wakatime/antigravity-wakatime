@@ -84,7 +84,10 @@ test('hooks use the cross-platform runner command', () => {
   const hooks = JSON.parse(fs.readFileSync(hookConfigPath, 'utf8'))['antigravity-cli-wakatime'];
   const commands = [hooks.PreInvocation[0].command, hooks.PostToolUse[0].hooks[0].command];
 
-  assert.deepEqual(commands, ['scripts/run --event=preInvocation', 'scripts/run --event=postToolUse']);
+  assert.deepEqual(commands, [
+    'scripts\\run.cmd --event=preInvocation || scripts/run --event=preInvocation 2>nul',
+    'scripts\\run.cmd --event=postToolUse || scripts/run --event=postToolUse 2>nul',
+  ]);
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'scripts', 'run')));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'scripts', 'run.cmd')));
 });

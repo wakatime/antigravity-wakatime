@@ -3,7 +3,7 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "scripts/run --event=preInvocation",
+        "command": "scripts\\run.cmd --event=preInvocation || scripts/run --event=preInvocation 2>nul",
         "timeout": 5
       }
     ],
@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "scripts/run --event=postToolUse",
+            "command": "scripts\\run.cmd --event=postToolUse || scripts/run --event=postToolUse 2>nul",
             "timeout": 5
           }
         ]

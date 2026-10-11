@@ -5,7 +5,7 @@
 The plugin installs [wakatime-cli][wakatime-cli] into `~/.wakatime/`, checks GitHub Releases for wakatime-cli updates when a new session makes its first model invocation, and syncs AI heartbeats after model invocations and file-edit tool events. Hook payload and installation paths are used to identify whether the host is Antigravity or Antigravity CLI.
 
 The hook runner is detached and passes hook payloads over a pipe. It does not create update markers, heartbeat state, or temporary payload files.
-The hook command works across platforms: Unix-like systems use `scripts/run`, while Windows resolves the same command to `scripts/run.cmd`.
+The hook command works across platforms: `cmd.exe` on Windows runs `scripts\run.cmd`, with a `scripts/run` fallback for Unix-like shells.
 
 ## Install for Antigravity CLI
 
