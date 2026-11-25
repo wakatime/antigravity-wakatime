@@ -84,7 +84,10 @@ test('hooks use the cross-platform runner command', () => {
   const hooks = JSON.parse(fs.readFileSync(hookConfigPath, 'utf8'))['antigravity-cli-wakatime'];
   const commands = [hooks.PreInvocation[0].command, hooks.PostToolUse[0].hooks[0].command];
 
-  assert.deepEqual(commands, ['scripts/run --event=preInvocation', 'scripts/run --event=postToolUse']);
+  assert.deepEqual(commands, [
+    'scripts\\run.cmd --event=preInvocation || scripts/run --event=preInvocation',
+    'scripts\\run.cmd --event=postToolUse || scripts/run --event=postToolUse',
+  ]);
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'scripts', 'run')));
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'scripts', 'run.cmd')));
 });
@@ -102,6 +105,27 @@ test('runner uses NODE_BIN when node is unavailable in PATH', { skip: process.pl
   });
 
   assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {});
+});
+
+test('Windows hook command runs via cmd.exe and uses NODE_BIN when node is unavailable in PATH', { skip: process.platform !== 'win32' }, () => {
+  const hooks = JSON.parse(fs.readFileSync(hookConfigPath, 'utf8'))['antigravity-cli-wakatime'];
+  const command = hooks.PostToolUse[0].hooks[0].command;
+  const result = childProcess.spawnSync(process.env.ComSpec || 'cmd.exe', ['/c', command], {
+    cwd: path.resolve(__dirname, '..'),
+    env: {
+      ...process.env,
+      NODE_BIN: process.execPath,
+      NODE_OPTIONS: '--definitely-not-a-valid-node-option',
+      PATH: '',
+    },
+    input: '',
+    encoding: 'utf8',
+  });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
   assert.deepEqual(JSON.parse(result.stdout), {});
 });
 
