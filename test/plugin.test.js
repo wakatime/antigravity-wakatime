@@ -89,6 +89,16 @@ test('hooks use the cross-platform runner command', () => {
   assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'scripts', 'run.cmd')));
 });
 
+test('PostToolUse matcher covers both legacy and CLI file-modification tool names', () => {
+  const hooks = JSON.parse(fs.readFileSync(hookConfigPath, 'utf8'))['antigravity-cli-wakatime'];
+  const matcher = new RegExp(`^(?:${hooks.PostToolUse[0].matcher})$`);
+
+  for (const tool of ['write_to_file', 'replace_file_content', 'multi_replace_file_content', 'write_file', 'edit_file']) {
+    assert.match(tool, matcher);
+  }
+  assert.doesNotMatch('read_file', matcher);
+});
+
 test('runner uses NODE_BIN when node is unavailable in PATH', { skip: process.platform === 'win32' }, () => {
   const result = childProcess.spawnSync('/bin/sh', [runnerPath, '--event=postToolUse'], {
     env: {
